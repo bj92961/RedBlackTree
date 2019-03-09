@@ -1,0 +1,487 @@
+class RedBlackNode:
+    def __init__(self, value = None):
+        self.value = value
+        self.red = True
+        self.left = None
+        self.right = None
+        self.parent = None
+    
+    def is_leaf_node(self):
+        return (self.right == None) and (self.left == None)
+    
+    def has_two_children(self):
+        return (self.right != None) and (self.left != None)
+    
+    def has_one_child(self):
+        return (not self.is_leaf_node()) and (not self.has_two_children())
+    
+    def is_root(self):
+        return self.parent == None
+    
+    def node_color(self):
+        if self.red:
+            return 'red'
+        else:
+            return 'black'
+    
+    def is_parent_left_node(self): #is this node its parent left child?
+        parent = self.parent
+        left = parent.left
+        right = parent.right
+        if (left != None) and (left.value == self.value):
+            return True
+        if (right != None) and (right.value == self.value):
+            return False
+        
+    def BST_add (self, new_node):
+        """Adds a new node to RBT using normal BST adding method. Color balance is not handled"""
+        newRoot = self
+        if new_node.value <= self.value:
+            self.left = self.add_to_subTree (self, self.left, new_node)
+        else:
+            self.right = self.add_to_subTree (self, self.right, new_node)
+            
+        return newRoot
+    
+    def add_to_subTree (self, grand_parent, parent, new_node):
+        if parent is None:
+            new_node.parent = grand_parent
+            return new_node
+        parent = parent.BST_add (new_node)
+        return parent
+        
+    def inorder(self):
+        """ traversal of tree rooted at given node."""
+        if self.left:
+            self.left.inorder() 
+        print(f'({self.value},{self.node_color()})', end=' ')
+        if self.right:
+            self.right.inorder()
+            
+class RedBlackTree:
+    def __init__(self):
+        """Create empty RBT."""
+        self.root = None
+        
+    def search(self, target):
+        """Check whether rbT contains target value."""
+        node = self.root
+        while node:
+            if target < node.value:
+                node = node.left
+            elif target == node.value:
+                return True, node
+            else:
+                node = node.right
+        return False, node
+    
+    def traverse(self):
+        self.root.inorder()
+        print()
+    
+    def add(self, value):
+        #first, we add value to the tree without considering color
+        #We make the new node as red and use the normal BST add method
+        found, node = self.search(value)
+        if found:
+            print(f'{node.value}: Duplicate value is not allowed!')
+            return 
+        
+        new_node = RedBlackNode(value)
+        if self.root is None:
+            #this new_node is root
+            self.root = new_node
+            self.root.red = False
+        else:
+            self.root.BST_add (new_node)
+        
+        #The new node is red, it might be attached to a red parent.
+        #It is why the red-black tree might be broken after this BST_add operation.
+        #Now, it is time to balance the color. A bit complicated. And it is one piece of the meat
+        #of red-black tree. 
+        self.adjust_color_for_add(new_node)
+    
+    def adjust_color_for_add(self, new_node):
+    #This funtion is to solve the problem when new_node is attached to a red parent
+    #Remember, the new_node is always set to red.
+        if new_node.is_root():
+            #if new_node is root, set it to black.  
+            new_node.red = False 
+            return
+        
+        parent = new_node.parent
+        if parent.node_color() == 'black':
+            #if parent is black, no color balancing is needed
+            return
+        
+        #When we get this point, parent is a red node for following cases
+        #grandparent has to be black
+        #parent = red, gp = black
+        gp = parent.parent
+        uncle = None
+        if parent.is_parent_left_node():
+            uncle = gp.right
+        else:
+            uncle = gp.left
+        uncle_color = 'red'
+        if uncle == None:
+            #None is always black
+            uncle_color = 'black'
+        elif uncle.node_color() == 'black':
+            uncle_color = 'black'
+            
+        if uncle_color == 'red':
+            #set p, u to black, gp to red. Then treat gp as a new node to adjust color.
+            #Covered by test case 6
+            parent.red = False
+            uncle.red = False
+            gp.red = True
+            self.adjust_color_for_add(gp)
+            return
+            
+        #When we get this point, parent is a red, grandparent is black, uncle is black 
+        #x = red, parent = red, gp = black. There are 4 subcases
+        if parent.is_parent_left_node() and new_node.is_parent_left_node():
+            #p is left, x is left. left_left_turn().  
+            self.left_left_turn_for_add(new_node)
+            return
+                
+        if parent.is_parent_left_node() and (not new_node.is_parent_left_node()):
+            #p is left, x is right. First conver it to left, left. Then left_left_turn().  
+            t2 = new_node.left
+            if t2 != None:
+                t2.parent = parent
+            parent.right = t2
+            parent.parent = new_node
+            new_node.left = parent
+            new_node.parent = gp
+            self.left_left_turn_for_add(parent)
+            return
+        
+        if (not parent.is_parent_left_node()) and (not new_node.is_parent_left_node()):
+            #p is right, x is right. right_right_turn().  
+            self.right_right_turn_for_add(new_node)
+            return
+
+        if (not parent.is_parent_left_node()) and new_node.is_parent_left_node():
+            #p is right, x is left. First, convert it to right-right. then right_right_turn(). 
+            t2 = new_node.right
+            if t2 != None:
+                t2.parent = parent
+            parent.left = t2
+            parent.parent = new_node
+            new_node.right = parent
+            new_node.parent = gp
+            self.right_right_turn_for_add(parent)
+            return
+        
+    def left_left_turn_for_add(self, node):
+        parent = node.parent
+        gp = parent.parent
+        gp_parent = gp.parent   
+        t = parent.right
+        if gp_parent != None:  
+            #gp_parent is not root
+            if gp.is_parent_left_node():
+                gp_parent.left = parent
+            else:
+                gp_parent.right = parent
+        else: 
+            #parent now becomes root
+            self.root = parent
+        parent.parent = gp_parent
+        parent.right = gp
+        parent.red = False
+        gp.left = t
+        gp.parent = parent
+        gp.red = True
+        if t != None: 
+            #t is not None
+            t.parent = gp
+     
+    def right_right_turn_for_add(self, node):
+        parent = node.parent
+        gp = parent.parent
+        gp_parent = gp.parent   
+        t = parent.left
+        if gp_parent != None:  
+            #gp_parent is not root
+            if gp.is_parent_left_node():
+                gp_parent.left = parent
+            else:
+                gp_parent.right = parent
+        else: 
+            #parent now becomes root
+            self.root = parent
+        parent.parent = gp_parent
+        parent.left = gp
+        parent.red = False
+        gp.right = t
+        gp.parent = parent
+        gp.red = True
+        if t != None: 
+            #t is not None
+            t.parent = gp
+    
+    def locate_node_to_delete(self, value):
+        found_node, node = self.search(value)
+        candidate_node = None
+        
+        if found_node and node.has_two_children():
+            #This node has two children. We need exchange this node with a leaf node. 
+            #We need to make sure the node to be deleted is either a leaf node or a node without one child only
+            candidate_node = node.left
+            while candidate_node.right != None:
+                candidate_node = candidate_node.right
+            #Exchange value between node and candidate_node
+            node.value, candidate_node.value = candidate_node.value, value 
+            if candidate_node.left != None:
+                return self.node_to_delete(candidate_node)
+            else:
+                return found_node, candidate_node
+        else:
+            #node is leaf node or with only right tree
+            return found_node, node
+    
+    def node_to_delete(self, node):
+        candidate = node.left
+        while candidate.right != None:
+                candidate = candidate.right
+            #Exchange value between node and candidate_node
+        node.value, candidate.value = candidate.value, node.value
+        if candidate.left != None:
+            return self.node_to_delete(candidate)
+        else:
+            return True, candidate
+
+    def delete(self, value):
+        #A leaf to be deleted has four senarios: 1. leaf node, 2. a node with only one child, 3. a node with two children
+        #In normal BST deletion operation, it is very easy for senarios 1 and 2. But we can change senario 3 to either 1 or 2
+        
+        #Function locate_node_to_delete can make sure the to-be-deleted note is either a leaf node or a node with only one child
+        found_node, node = self.locate_node_to_delete(value)
+            
+        if not found_node:
+            print(f'Value: {value} not found!')
+            return
+        child = None
+        child_color = None
+        if node.has_one_child():
+            if node.right != None:
+                child = node.right
+            else:
+                child = node.left
+            child_color = child.node_color()
+        else:
+            #node is a leaf node. 
+            child = None
+            child_color = 'black'
+        
+        if node.is_root():
+            #The node to be deleted is root. Child now becomes the root. We handle it specially
+            #Two cases: 1. leaf node   2. node has only right child.  
+            self.root = child
+            if child != None:
+                child.parent = None
+                child.red = False
+            return
+        
+        parent = node.parent
+        if (node.node_color() == 'black') and (child_color == 'black'): 
+            #node and its child are all black. That is to say child is double black.
+            #we need to adjust color
+            self.adjust_color_for_delete(node)
+        
+        #physically delete the node from tree
+        if node.is_parent_left_node():
+            #this node is in parent left node
+            parent.left = child
+        else:
+            #this node is in parent right node
+            parent.right = child
+        if child != None:
+            child.parent = parent
+            child.red = False   
+    
+    def adjust_color_for_delete(self, node):
+        #This node is double black, we need to adjust color
+        if node.is_root():
+            node.red = False
+            return
+        parent = node.parent
+        if parent.has_one_child():
+            #means node has no sibling
+            if parent.node_color() == 'red':
+                parent.red = False
+            else:
+                self.adjust_color_for_delete(parent)
+            return
+        #from now on, sibling exsits
+        sibling_on_right = False
+        sibling = None
+        if node.is_parent_left_node():
+            sibling_on_right = True
+            sibling = parent.right
+        else:
+            sibling = parent.left
+            
+        if (sibling.node_color() == 'red'):
+            if sibling_on_right:
+                self.right_right_turn_for_delete(parent, 'red')  
+            else:
+                self.left_left_turn_for_delete(parent, 'red') 
+            self.adjust_color_for_delete(node)
+            return
+        
+        #when we get this point, the sibling is black
+        r1 = sibling.left
+        r2 = sibling.right
+        if ((r1 != None) and (r1.node_color() == 'red')) \
+           and ((r2 != None) and (r2.node_color() == 'red')):
+            #both r1 and r2 are red
+            if sibling_on_right:
+                self.right_right_turn_for_delete(parent, 'black')  
+            else:
+                self.left_left_turn_for_delete(parent, 'black') 
+            return     
+        if (r1 != None) and (r1.node_color() == 'red'):
+            if sibling_on_right:
+                self.left_left_turn_for_delete(sibling, 'red') 
+                self.adjust_color_for_delete(node) 
+            else:
+                self.left_left_turn_for_delete(parent, 'black') 
+            return
+        if (r2 != None) and (r2.node_color() == 'red'):
+            if sibling_on_right:
+                self.right_right_turn_for_delete(parent, 'black') 
+            else:
+                self.right_right_turn_for_delete(sibling, 'red') 
+                self.adjust_color_for_delete(node) 
+            return
+        #when we get this point, all children should be black or sibling is leaf node.
+        sibling.red = True
+        if parent.node_color() == 'red':
+            parent.red = False 
+            return
+        else:
+            self.adjust_color_for_delete(parent)
+            return
+        
+    def right_right_turn_for_delete(self, parent, sibling_color):
+        gp = parent.parent
+        sibling = parent.right
+        r1 = sibling.left
+        parent_is_root = True
+        if not parent.is_root():
+            parent_is_root = False
+            if parent.is_parent_left_node():
+                gp.left = sibling
+            else:
+                gp.right = sibling
+            sibling.parent = gp
+        #now make right-right turn
+        sibling.red = parent.red   #sibling keep the same color as original parent color
+        sibling.left = parent
+        parent.parent = sibling  
+        parent.right = r1
+        if r1 != None:
+            r1.parent = parent
+        r2 = sibling.right
+        if sibling_color == 'black':
+            r2.red = False
+            parent.red = False
+        else:
+            parent.red = True
+        
+        if parent_is_root:
+            #then sibling is root after rotation
+            sibling.parent = None
+            sibling.red = False
+            self.root = sibling
+        
+    def left_left_turn_for_delete(self, parent, sibling_color):
+        gp = parent.parent
+        sibling = parent.left
+        r2 = sibling.right
+        parent_is_root = True
+        if not parent.is_root():
+            parent_is_root = False
+            if parent.is_parent_left_node():
+                gp.left = sibling
+            else:
+                gp.right = sibling
+            sibling.parent = gp
+            
+        #now make right-right turn
+        sibling.red = parent.red   #sibling keep the same color as original parent color
+        sibling.right = parent
+        parent.parent = sibling
+        parent.left = r2
+        if r2 != None:
+            r2.parent = parent
+        r1 = sibling.left
+        if sibling_color == 'black':
+            r1.red = False #r1 has to be black
+            parent.red = False
+        else:
+            parent.red = True
+                
+        if parent_is_root:
+            #then sibling is root after rotation
+            sibling.parent = None
+            sibling.red = False
+            self.root = sibling           
+                
+    def get_all_leaf_nodes(self, node):
+        #For testing purpose
+        leaf_nodes = []
+        if node.is_leaf_node():
+            leaf_nodes.append(node)
+            return leaf_nodes
+        
+        #check if it is a valid BST 
+        if node.left != None:
+            if node.value >= node.left.value:
+                leaf_nodes.extend(self.get_all_leaf_nodes(node.left))
+            else:
+                #invalid BST
+                raise Exception("Invalid binarry search tree!", node.value)
+        
+        if node.right != None:
+            if node.value < node.right.value:
+                leaf_nodes.extend(self.get_all_leaf_nodes(node.right))
+            else:
+                #invalid BST
+                raise Exception("Invalid binarry search tree!", node.value)
+        return leaf_nodes   
+            
+    def is_valid_red_black_tree(self):
+        #for testing purpose
+        #Verfiy if a RB tree is valid
+        if self.root == None:
+            print('Valid red-black tree!')
+            return
+        if (not self.root.is_root()) or (self.root.red == True):
+            print('INVALID red-black tree! Problem with root node.')
+            return
+        num_black_layers_first_leaf_node = 0
+        leaf_nodes = self.get_all_leaf_nodes(self.root)
+        for i in range(len(leaf_nodes)):
+            num_black_layers = 0
+            node = leaf_nodes[i]
+            while node != None:
+                if node.red == False:
+                    num_black_layers += 1
+                if node.parent != None:
+                    if node.red and node.parent.red: 
+                        #both node and its parent are all red
+                        print(f'INVALID red-black tree! Problem with color {node.value}-{node.parent.value}')
+                        return
+                node = node.parent
+            if i == 0:
+                num_black_layers_first_leaf_node = num_black_layers
+            
+            if num_black_layers_first_leaf_node != num_black_layers:
+                print(f'INVALID red-black tree! Problem is from leaf node {leaf_nodes[i].value} to root!')
+                return      
+        print('Valid red-black tree!')
