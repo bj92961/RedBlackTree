@@ -228,32 +228,18 @@ class RedBlackTree:
         candidate_node = None
         
         if found_node and node.has_two_children():
-            #This node has two children. We need exchange this node with a leaf node. 
-            #We need to make sure the node to be deleted is either a leaf node or a node without one child only
+            #This node has two children. We need exchange this node with a leaf node or a node with one child only. 
+            #We need to make sure the node to be deleted is either a leaf node or a node with one child only
             candidate_node = node.left
             while candidate_node.right != None:
                 candidate_node = candidate_node.right
             #Exchange value between node and candidate_node
             node.value, candidate_node.value = candidate_node.value, value 
-            if candidate_node.left != None:
-                return self.node_to_delete(candidate_node)
-            else:
-                return found_node, candidate_node
+            return found_node, candidate_node
         else:
-            #node is leaf node or with only right tree
+            #node is leaf node or with one child only
             return found_node, node
-    
-    def node_to_delete(self, node):
-        candidate = node.left
-        while candidate.right != None:
-                candidate = candidate.right
-            #Exchange value between node and candidate_node
-        node.value, candidate.value = candidate.value, node.value
-        if candidate.left != None:
-            return self.node_to_delete(candidate)
-        else:
-            return True, candidate
-
+ 
     def delete(self, value):
         #A leaf to be deleted has four senarios: 1. leaf node, 2. a node with only one child, 3. a node with two children
         #In normal BST deletion operation, it is very easy for senarios 1 and 2. But we can change senario 3 to either 1 or 2
